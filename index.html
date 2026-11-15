@@ -194,8 +194,8 @@ function renderRecord(){
     const people = settings.people;
     $app.innerHTML = `
       <header><button class="icon" id="bBack">‹ 목록</button><h1>새 회의</h1></header>
-      <label>회의 제목</label><input id="iTitle" placeholder="예: 비이에스 미팅">
-      <label>참석자 (쉼표로 구분, 안 적어도 돼요)</label><input id="iPeople" placeholder="예: 대표님, 거래처 과장, 나">
+      <label>회의 제목</label><input id="iTitle" placeholder="예: 주간 회의">
+      <label>참석자 (쉼표로 구분, 안 적어도 돼요)</label><input id="iPeople" placeholder="예: 대표님, 나">
       ${people.length ? `<div class="chips">${people.map(p => `<button class="chip" data-p="${esc(p)}">+ ${esc(p)}</button>`).join("")}</div>` : ""}
       <div class="notice" style="margin-top:18px">녹음하는 동안 <b>화면을 켜 둔 채</b>로 두세요. 화면이 꺼지거나 전화가 오면 녹음이 멈춰요. 멈추면 <b>이어서 녹음</b>을 누르면 같은 회의에 이어 붙어요.</div>
       <button class="primary" id="bStart" style="width:100%;padding:16px;font-size:18px">녹음 시작</button>`;
