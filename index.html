@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="회의노트">
+<meta name="theme-color" content="#ffffff">
+<link rel="apple-touch-icon" href="icon.png">
+<title>회의노트</title>
+<style>
+:root{--bg:#f5f5f2;--card:#fff;--text:#1d1d1b;--sub:#6b6a66;--line:#e3e2dc;--accent:#2f6fde;--accent-bg:#e8f0fd;--red:#d64541;--red-bg:#fdecea;--green:#2e8b57;--amber:#b7791f;--amber-bg:#fdf3e1;--radius:12px}
+@media (prefers-color-scheme:dark){:root{--bg:#161615;--card:#222220;--text:#f1f0ec;--sub:#a3a29c;--line:#3a3a37;--accent:#6ea0f5;--accent-bg:#1f2b42;--red:#f07a74;--red-bg:#3d2221;--green:#5cc28a;--amber:#e9b45a;--amber-bg:#3a2f1c}}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{margin:0;background:var(--bg);color:var(--text);font-family:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Malgun Gothic",sans-serif;font-size:16px;line-height:1.55}
+body{padding:env(safe-area-inset-top) 0 env(safe-area-inset-bottom)}
+.wrap{max-width:640px;margin:0 auto;padding:12px 16px 120px}
+header{display:flex;align-items:center;gap:8px;padding:6px 0 12px}
+header h1{font-size:22px;font-weight:600;margin:0;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+button{font:inherit;color:inherit;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 14px;cursor:pointer}
+button:active{transform:scale(.98)}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button.danger{color:var(--red);border-color:var(--red)}
+button.icon{border:none;background:none;padding:8px;font-size:15px;color:var(--accent)}
+button[disabled]{opacity:.5}
+input,textarea,select{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--line);border-radius:10px;padding:10px 12px;width:100%}
+textarea{min-height:80px;resize:vertical}
+label{display:block;font-size:14px;color:var(--sub);margin:14px 0 6px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:var(--radius);padding:14px 16px;margin-bottom:10px}
+.item{display:block;width:100%;text-align:left;margin-bottom:8px}
+.item .t{font-weight:600}
+.sub{color:var(--sub);font-size:13px}
+.badge{display:inline-block;font-size:12px;padding:2px 8px;border-radius:8px;background:var(--accent-bg);color:var(--accent);margin-left:6px;vertical-align:1px}
+.badge.warn{background:var(--amber-bg);color:var(--amber)}
+.badge.err{background:var(--red-bg);color:var(--red)}
+.empty{text-align:center;color:var(--sub);padding:48px 12px}
+.fab{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(20px + env(safe-area-inset-bottom));width:72px;height:72px;border-radius:50%;background:var(--red);border:none;color:#fff;font-size:15px;font-weight:600;box-shadow:0 4px 14px rgba(0,0,0,.18)}
+.fab:active{transform:translateX(-50%) scale(.96)}
+.timer{font-size:56px;font-weight:300;text-align:center;font-variant-numeric:tabular-nums;margin:28px 0 4px}
+.recstate{text-align:center;color:var(--sub);margin-bottom:24px}
+.dot{display:inline-block;width:10px;height:10px;border-radius:50%;background:var(--red);margin-right:6px;animation:blink 1.2s infinite}
+@keyframes blink{50%{opacity:.2}}
+.row{display:flex;gap:10px}
+.row>*{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}
+.chip{font-size:14px;padding:6px 10px;border-radius:16px}
+.tabs{display:flex;gap:6px;margin:4px 0 12px}
+.tabs button{flex:1;padding:8px}
+.tabs button.on{background:var(--accent-bg);color:var(--accent);border-color:var(--accent)}
+.utt{padding:8px 0;border-bottom:1px solid var(--line)}
+.utt:last-child{border-bottom:none}
+.spk{font-weight:600;color:var(--accent);background:none;border:none;padding:0;font-size:14px}
+.time{color:var(--sub);font-size:12px;margin-left:6px}
+.sec h3{font-size:15px;margin:0 0 6px}
+.sec ul{margin:0;padding-left:20px}
+.sec li{margin:3px 0}
+.notice{background:var(--amber-bg);color:var(--amber);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:12px}
+.error{background:var(--red-bg);color:var(--red);border-radius:10px;padding:10px 12px;font-size:14px;margin-bottom:12px;white-space:pre-wrap;word-break:break-all}
+.progress{color:var(--accent);font-size:14px;margin-bottom:12px}
+audio{width:100%;margin:6px 0}
+a{color:var(--accent)}
+.hidden{display:none!important}
+.toast{position:fixed;left:50%;bottom:110px;transform:translateX(-50%);background:#333;color:#fff;padding:10px 16px;border-radius:20px;font-size:14px;z-index:9;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:.95}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<div class="toast" id="toast"></div>
+<input type="file" id="filePick" accept="audio/*,video/mp4,.m4a,.mp3,.wav,.aac" class="hidden">
+<script>
+"use strict";
+/* ===== 기본 설정 ===== */
+const API_BASE = "https://generativelanguage.googleapis.com";
+const INLINE_LIMIT = 12 * 1024 * 1024; // 이보다 큰 파일은 Files API로 업로드
+const DEFAULT_MODEL = "gemini-flash-latest";
+const $app = document.getElementById("app");
+
+const settings = {
+  get key(){ return localStorage.getItem("mn_key") || ""; },
+  set key(v){ localStorage.setItem("mn_key", v.trim()); },
+  get model(){ return localStorage.getItem("mn_model") || DEFAULT_MODEL; },
+  set model(v){ localStorage.setItem("mn_model", v.trim() || DEFAULT_MODEL); },
+  get people(){ try { return JSON.parse(localStorage.getItem("mn_people") || "[]"); } catch(e){ return []; } },
+  set people(v){ localStorage.setItem("mn_people", JSON.stringify(v)); },
+  get extra(){ return localStorage.getItem("mn_extra") || ""; },
+  set extra(v){ localStorage.setItem("mn_extra", v); }
+};
+
+/* ===== 저장소 (IndexedDB) ===== */
+let _db;
+function db(){
+  if (_db) return Promise.resolve(_db);
+  return new Promise((res, rej) => {
+    const r = indexedDB.open("meetingnote", 1);
+    r.onupgradeneeded = () => r.result.createObjectStore("meetings", { keyPath: "id" });
+    r.onsuccess = () => { _db = r.result; res(_db); };
+    r.onerror = () => rej(r.error);
+  });
+}
+async function store(mode){ return (await db()).transaction("meetings", mode).objectStore("meetings"); }
+function req2p(r){ return new Promise((res, rej) => { r.onsuccess = () => res(r.result); r.onerror = () => rej(r.error); }); }
+async function getAll(){ return req2p((await store("readonly")).getAll()); }
+async function getM(id){ return req2p((await store("readonly")).get(id)); }
+async function putM(m){ m.updatedAt = Date.now(); return req2p((await store("readwrite")).put(m)); }
+async function delM(id){ return req2p((await store("readwrite")).delete(id)); }
+
+/* ===== 공통 도우미 ===== */
+function esc(s){ return String(s ?? "").replace(/[&<>"']/g, c => ({ "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;" }[c])); }
+function fmtTime(sec){ sec = Math.max(0, Math.round(sec)); const h = Math.floor(sec/3600), m = Math.floor(sec%3600/60), s = sec%60; return (h ? h + ":" + String(m).padStart(2,"0") : m) + ":" + String(s).padStart(2,"0"); }
+function fmtDate(t){ const d = new Date(t); return (d.getMonth()+1) + "/" + d.getDate() + " " + String(d.getHours()).padStart(2,"0") + ":" + String(d.getMinutes()).padStart(2,"0"); }
+function toast(msg){ const t = document.getElementById("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(t._h); t._h = setTimeout(() => t.classList.remove("show"), 2200); }
+function uid(){ return Date.now().toString(36) + Math.random().toString(36).slice(2, 7); }
+function parseTimeStr(s){ if (typeof s === "number") return s; const p = String(s || "0").split(":").map(Number); if (p.some(isNaN)) return 0; return p.reduce((a, b) => a * 60 + b, 0); }
+async function copyText(text){
+  try { await navigator.clipboard.writeText(text); toast("복사했어요"); }
+  catch(e){ const ta = document.createElement("textarea"); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); toast("복사했어요"); }
+}
+function blobDuration(blob){
+  return new Promise(res => {
+    const a = document.createElement("audio"); const url = URL.createObjectURL(blob);
+    let done = false; const fin = v => { if (done) return; done = true; URL.revokeObjectURL(url); res(isFinite(v) ? v : 0); };
+    a.preload = "metadata"; a.src = url;
+    a.onloadedmetadata = () => {
+      if (isFinite(a.duration)) return fin(a.duration);
+      a.currentTime = 1e7; a.ontimeupdate = () => { a.ontimeupdate = null; fin(a.duration); };
+    };
+    a.onerror = () => fin(0); setTimeout(() => fin(0), 5000);
+  });
+}
+const STATUS = { recording:"녹음 중단됨", ready:"정리 대기", working:"정리 중", done:"정리 완료", error:"오류" };
+
+/* ===== 화면 전환 ===== */
+let current = { view: "list" };
+function go(view, arg){
+  if (view !== "record" && rec.active) { if (!confirm("녹음 중이에요. 녹음을 끝내고 나갈까요?")) return; stopRecording(true); return; }
+  current = { view, arg }; history.replaceState(null, "", "#" + view);
+  render(); window.scrollTo(0, 0);
+}
+async function render(){
+  if (current.view === "list") return renderList();
+  if (current.view === "record") return renderRecord();
+  if (current.view === "detail") return renderDetail(current.arg);
+  if (current.view === "settings") return renderSettings();
+}
+
+/* ===== 1. 회의 목록 ===== */
+async function renderList(){
+  const list = (await getAll()).sort((a, b) => b.createdAt - a.createdAt);
+  const noKey = !settings.key;
+  $app.innerHTML = `
+    <header><h1>회의노트</h1>
+      <button class="icon" id="bImport">파일 가져오기</button>
+      <button class="icon" id="bSet">설정</button></header>
+    ${noKey ? `<div class="notice">처음이시면 <b>설정</b>에서 Gemini API 키를 먼저 넣어 주세요. 키가 없어도 녹음은 돼요.</div>` : ""}
+    ${list.length ? list.map(m => `
+      <button class="card item" data-id="${m.id}">
+        <div class="t">${esc(m.title)}</div>
+        <div class="sub">${fmtDate(m.createdAt)} · ${fmtTime(m.duration || 0)}
+          <span class="badge ${m.status === "error" ? "err" : (m.status === "done" ? "" : "warn")}">${STATUS[m.status] || ""}</span></div>
+      </button>`).join("") : `<div class="empty">아직 회의가 없어요.<br>아래 빨간 버튼을 눌러 녹음을 시작하세요.</div>`}
+    <button class="fab" id="bRec">녹음</button>`;
+  $app.querySelectorAll(".item").forEach(b => b.onclick = () => go("detail", b.dataset.id));
+  document.getElementById("bRec").onclick = () => go("record");
+  document.getElementById("bSet").onclick = () => go("settings");
+  document.getElementById("bImport").onclick = () => document.getElementById("filePick").click();
+}
+document.getElementById("filePick").onchange = async e => {
+  const f = e.target.files[0]; e.target.value = ""; if (!f) return;
+  const dur = await blobDuration(f);
+  const m = { id: uid(), title: f.name.replace(/\.[^.]+$/, "") || "가져온 녹음", attendees: "", createdAt: Date.now(),
+    duration: dur, segments: [{ blob: f, mime: f.type || guessMime(f.name), duration: dur }], status: "ready", speakerNames: {} };
+  await putM(m); go("detail", m.id);
+  if (settings.key) processMeeting(m.id);
+};
+function guessMime(name){ const x = (name.split(".").pop() || "").toLowerCase(); return { m4a:"audio/mp4", mp4:"audio/mp4", mp3:"audio/mp3", wav:"audio/wav", aac:"audio/aac", webm:"audio/webm", ogg:"audio/ogg" }[x] || "audio/mp4"; }
+
+/* ===== 2. 녹음 ===== */
+const rec = { running:false, active:false, meeting:null, stream:null, recorder:null, chunks:[], segStart:0, elapsedBefore:0, segElapsed:0, tick:null, wake:null, interrupted:false, saveTimer:null, lastResume:0 };
+
+function pickMime(){
+  if (!window.MediaRecorder) return "";
+  for (const t of ["audio/mp4;codecs=mp4a.40.2", "audio/mp4", "audio/webm;codecs=opus", "audio/webm"]) if (MediaRecorder.isTypeSupported(t)) return t;
+  return "";
+}
+async function wakeOn(){ try { if ("wakeLock" in navigator && !rec.wake) { rec.wake = await navigator.wakeLock.request("screen"); rec.wake.addEventListener("release", () => rec.wake = null); } } catch(e){} }
+function wakeOff(){ try { rec.wake && rec.wake.release(); } catch(e){} rec.wake = null; }
+
+function renderRecord(){
+  if (!rec.active) {
+    const people = settings.people;
+    $app.innerHTML = `
+      <header><button class="icon" id="bBack">‹ 목록</button><h1>새 회의</h1></header>
+      <label>회의 제목</label><input id="iTitle" placeholder="예: 비이에스 미팅">
+      <label>참석자 (쉼표로 구분, 안 적어도 돼요)</label><input id="iPeople" placeholder="예: 대표님, 거래처 과장, 나">
+      ${people.length ? `<div class="chips">${people.map(p => `<button class="chip" data-p="${esc(p)}">+ ${esc(p)}</button>`).join("")}</div>` : ""}
+      <div class="notice" style="margin-top:18px">녹음하는 동안 <b>화면을 켜 둔 채</b>로 두세요. 화면이 꺼지거나 전화가 오면 녹음이 멈춰요. 멈추면 <b>이어서 녹음</b>을 누르면 같은 회의에 이어 붙어요.</div>
+      <button class="primary" id="bStart" style="width:100%;padding:16px;font-size:18px">녹음 시작</button>`;
+    document.getElementById("bBack").onclick = () => go("list");
+    $app.querySelectorAll(".chip").forEach(c => c.onclick = () => {
+      const i = document.getElementById("iPeople"); const cur = i.value.split(",").map(s => s.trim()).filter(Boolean);
+      if (!cur.includes(c.dataset.p)) cur.push(c.dataset.p); i.value = cur.join(", ");
+    });
+    document.getElementById("bStart").onclick = startRecording;
+    return;
+  }
+  const paused = rec.recorder && rec.recorder.state === "paused";
+  $app.innerHTML = `
+    <header><h1>${esc(rec.meeting.title)}</h1></header>
+    <div class="timer" id="tTimer">${fmtTime(totalElapsed())}</div>
+    <div class="recstate" id="tState">${rec.interrupted ? "녹음이 멈췄어요. 아래 버튼으로 이어서 녹음하세요." : (paused ? "일시정지" : `<span class="dot"></span>녹음 중 · 화면을 켜 두세요`)}</div>
+    ${rec.interrupted
+      ? `<button class="primary" id="bResume2" style="width:100%;padding:16px;font-size:18px;margin-bottom:10px">이어서 녹음</button>`
+      : `<div class="row" style="margin-bottom:10px"><button id="bPause">${paused ? "다시 시작" : "일시정지"}</button></div>`}
+    <button class="danger" id="bStop" style="width:100%;padding:16px;font-size:18px">녹음 끝내기</button>
+    <p class="sub" style="text-align:center;margin-top:16px">${rec.meeting.segments.length ? `이어 붙인 구간 ${rec.meeting.segments.length}개 저장됨` : ""}</p>`;
+  if (rec.interrupted) document.getElementById("bResume2").onclick = resumeAfterInterrupt;
+  else document.getElementById("bPause").onclick = togglePause;
+  document.getElementById("bStop").onclick = () => stopRecording(false);
+}
+function totalElapsed(){
+  let seg = rec.segElapsed;
+  if (rec.running && !rec.interrupted) seg += (Date.now() - rec.lastResume) / 1000;
+  return rec.elapsedBefore + seg;
+}
+async function startRecording(){
+  const title = document.getElementById("iTitle").value.trim() || ("회의 " + fmtDate(Date.now()));
+  const attendees = document.getElementById("iPeople").value.trim();
+  rec.meeting = { id: uid(), title, attendees, createdAt: Date.now(), duration: 0, segments: [], status: "recording", speakerNames: {} };
+  rec.elapsedBefore = 0;
+  try { await openSegment(); }
+  catch(e){ alert("마이크를 쓸 수 없어요.\n아이폰 설정 > Safari > 마이크에서 허용해 주세요.\n(" + e.message + ")"); rec.active = false; return; }
+  await putM(rec.meeting);
+  try { navigator.storage && navigator.storage.persist && navigator.storage.persist(); } catch(e){}
+  renderRecord();
+}
+async function openSegment(){
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  const mime = pickMime();
+  const opts = { audioBitsPerSecond: 32000 }; if (mime) opts.mimeType = mime;
+  let r; try { r = new MediaRecorder(stream, opts); } catch(e){ r = new MediaRecorder(stream); }
+  rec.stream = stream; rec.recorder = r; rec.chunks = []; rec.segElapsed = 0; rec.interrupted = false; rec.active = true;
+  r.ondataavailable = ev => { if (ev.data && ev.data.size) rec.chunks.push(ev.data); };
+  r.onerror = () => markInterrupted();
+  r.onstop = () => { if (rec.active && !rec._stopping) markInterrupted(); };
+  stream.getAudioTracks().forEach(t => { t.onended = () => markInterrupted(); });
+  r.start(1000);
+  rec.lastResume = Date.now(); rec.running = true;
+  clearInterval(rec.tick); rec.tick = setInterval(() => { const el = document.getElementById("tTimer"); if (el) el.textContent = fmtTime(totalElapsed()); }, 500);
+  clearInterval(rec.saveTimer); rec.saveTimer = setInterval(saveDraft, 20000);
+  wakeOn();
+}
+function currentSegBlob(){ return rec.chunks.length ? new Blob(rec.chunks, { type: (rec.recorder && rec.recorder.mimeType) || rec.chunks[0].type || "audio/mp4" }) : null; }
+async function saveDraft(){
+  // 녹음 도중 앱이 꺼져도 그때까지 녹음된 건 남도록 주기적으로 저장
+  if (!rec.active || !rec.meeting || !rec.recorder) return;
+  const b = currentSegBlob(); if (!b) return;
+  const m = Object.assign({}, rec.meeting, { segments: rec.meeting.segments.concat([{ blob: b, mime: b.type, duration: rec.segElapsed + (rec.running ? (Date.now() - rec.lastResume)/1000 : 0) }]), duration: totalElapsed() });
+  try { await putM(m); } catch(e){}
+}
+function closeSegment(){
+  // 현재 구간을 끝내고 meeting.segments 에 추가
+  return new Promise(resolve => {
+    const r = rec.recorder;
+    if (rec.running) rec.segElapsed += (Date.now() - rec.lastResume) / 1000;
+    rec.running = false;
+    const finish = () => {
+      const b = currentSegBlob();
+      if (b && b.size > 0) rec.meeting.segments.push({ blob: b, mime: b.type, duration: rec.segElapsed });
+      rec.elapsedBefore += rec.segElapsed; rec.segElapsed = 0; rec.chunks = [];
+      try { rec.stream && rec.stream.getTracks().forEach(t => { t.onended = null; t.stop(); }); } catch(e){}
+      rec.stream = null; rec.recorder = null; resolve();
+    };
+    if (r && r.state !== "inactive") { rec._stopping = true; r.onstop = () => { rec._stopping = false; finish(); }; try { r.stop(); } catch(e){ rec._stopping = false; finish(); } }
+    else finish();
+  });
+}
+function markInterrupted(){
+  if (!rec.active || rec.interrupted) return;
+  rec.interrupted = true;
+  closeSegment().then(() => { putM(Object.assign(rec.meeting, { duration: totalElapsed() })); if (current.view === "record") renderRecord(); });
+}
+async function resumeAfterInterrupt(){
+  try { await openSegment(); renderRecord(); }
+  catch(e){ alert("마이크를 다시 열 수 없어요. 잠시 후 다시 눌러 주세요.\n(" + e.message + ")"); }
+}
+function togglePause(){
+  const r = rec.recorder; if (!r) return;
+  if (r.state === "recording") { r.pause(); rec.segElapsed += (Date.now() - rec.lastResume) / 1000; rec.running = false; }
+  else if (r.state === "paused") { r.resume(); rec.lastResume = Date.now(); rec.running = true; }
+  renderRecord();
+}
+async function stopRecording(goList){
+  clearInterval(rec.tick); clearInterval(rec.saveTimer);
+  if (!rec.interrupted) await closeSegment();
+  rec.active = false; rec.interrupted = false; wakeOff();
+  const m = rec.meeting; rec.meeting = null;
+  m.duration = rec.elapsedBefore; rec.elapsedBefore = 0;
+  if (!m.segments.length) { await delM(m.id); toast("녹음된 내용이 없어요"); current = { view: "list" }; return render(); }
+  m.status = "ready"; await putM(m);
+  current = goList ? { view: "list" } : { view: "detail", arg: m.id }; render();
+  if (settings.key) processMeeting(m.id);
+}
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "visible" || !rec.active) return;
+  wakeOn();
+  const r = rec.recorder, tr = rec.stream && rec.stream.getAudioTracks()[0];
+  if (!rec.interrupted && (!r || r.state === "inactive" || (tr && (tr.readyState === "ended" || tr.muted)))) markInterrupted();
+});
+window.addEventListener("beforeunload", e => { if (rec.active) { saveDraft(); e.preventDefault(); e.returnValue = ""; } });
+
+/* ===== Gemini 호출 ===== */
+function friendlyError(status, body){
+  const msg = (body && body.error && body.error.message) || "";
+  if (status === 429) return "무료 사용량을 잠깐 넘었어요. 1~2분 뒤에 '다시 정리'를 눌러 주세요.";
+  if (status === 400 && /API key|API_KEY/i.test(msg)) return "API 키가 맞지 않아요. 설정에서 키를 다시 확인해 주세요.";
+  if (status === 403) return "API 키 권한 문제예요. 설정에서 키를 다시 확인해 주세요.\n(" + msg + ")";
+  if (status === 404) return "모델 이름을 찾을 수 없어요. 설정의 모델 이름을 '" + DEFAULT_MODEL + "'로 바꿔 보세요.\n(" + msg + ")";
+  if (status >= 500) return "구글 서버가 잠시 바빠요. 조금 뒤에 다시 시도해 주세요.";
+  return "오류 (" + status + "): " + msg;
+}
+async function gfetch(url, opts, tries = 3){
+  for (let i = 0; i < tries; i++) {
+    let r;
+    try { r = await fetch(url, opts); }
+    catch(e){ if (i === tries - 1) throw new Error("인터넷 연결을 확인해 주세요. (" + e.message + ")"); await new Promise(s => setTimeout(s, 2000 * (i + 1))); continue; }
+    if (r.ok) return r;
+    let body = null; try { body = await r.json(); } catch(e){}
+    if ((r.status >= 500 || r.status === 429) && i < tries - 1) { await new Promise(s => setTimeout(s, (r.status === 429 ? 20000 : 3000) * (i + 1))); continue; }
+    const err = new Error(friendlyError(r.status, body)); err.status = r.status; err.raw = body; throw err;
+  }
+}
+function blobToBase64(blob){
+  return new Promise((res, rej) => { const fr = new FileReader(); fr.onload = () => res(String(fr.result).split(",")[1]); fr.onerror = () => rej(fr.error); fr.readAsDataURL(blob); });
+}
+function geminiMime(seg){
+  const t = (seg.mime || seg.blob.type || "").toLowerCase();
+  if (t.includes("mp4") || t.includes("m4a")) return "audio/mp4";
+  if (t.includes("webm")) return "audio/webm";
+  if (t.includes("mpeg") || t.includes("mp3")) return "audio/mp3";
+  if (t.includes("wav")) return "audio/wav";
+  if (t.includes("ogg")) return "audio/ogg";
+  if (t.includes("aac")) return "audio/aac";
+  return t.split(";")[0] || "audio/mp4";
+}
+async function uploadFile(blob, mime, onProg){
+  const key = settings.key;
+  onProg && onProg("녹음 파일 올리는 중…");
+  const start = await gfetch(API_BASE + "/upload/v1beta/files", {
+    method: "POST",
+    headers: { "x-goog-api-key": key, "X-Goog-Upload-Protocol": "resumable", "X-Goog-Upload-Command": "start",
+      "X-Goog-Upload-Header-Content-Length": String(blob.size), "X-Goog-Upload-Header-Content-Type": mime, "Content-Type": "application/json" },
+    body: JSON.stringify({ file: { display_name: "meeting-" + Date.now() } })
+  });
+  const upUrl = start.headers.get("x-goog-upload-url");
+  if (!upUrl) throw new Error("큰 녹음 파일을 올리는 주소를 받지 못했어요. 녹음이 너무 길면 나눠서 녹음해 주세요.");
+  const done = await gfetch(upUrl, { method: "POST", headers: { "X-Goog-Upload-Offset": "0", "X-Goog-Upload-Command": "upload, finalize" }, body: blob }, 2);
+  let file = (await done.json()).file;
+  for (let i = 0; i < 60 && file.state === "PROCESSING"; i++) {
+    onProg && onProg("구글에서 녹음 파일 확인 중…");
+    await new Promise(s => setTimeout(s, 3000));
+    file = await (await gfetch(API_BASE + "/v1beta/" + file.name, { headers: { "x-goog-api-key": key } })).json();
+  }
+  if (file.state === "FAILED") throw new Error("구글이 녹음 파일을 처리하지 못했어요.");
+  return { file_data: { mime_type: file.mimeType || mime, file_uri: file.uri } };
+}
+async function generate(parts){
+  const r = await gfetch(API_BASE + "/v1beta/models/" + encodeURIComponent(settings.model) + ":generateContent", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-goog-api-key": settings.key },
+    body: JSON.stringify({ contents: [{ role: "user", parts }], generationConfig: { temperature: 0.2, maxOutputTokens: 65536, responseMimeType: "application/json" } })
+  });
+  const data = await r.json();
+  const cand = data.candidates && data.candidates[0];
+  if (!cand) throw new Error("AI가 답을 주지 않았어요." + (data.promptFeedback && data.promptFeedback.blockReason ? " (" + data.promptFeedback.blockReason + ")" : ""));
+  const text = ((cand.content && cand.content.parts) || []).filter(p => !p.thought && p.text).map(p => p.text).join("");
+  if (cand.finishReason === "MAX_TOKENS") throw new Error("녹음이 너무 길어서 한 번에 다 받아적지 못했어요. 30~40분 단위로 나눠서 녹음해 주세요.");
+  return parseJSON(text);
+}
+function parseJSON(text){
+  let t = String(text || "").trim().replace(/^```(?:json)?/i, "").replace(/```$/, "").trim();
+  try { return JSON.parse(t); }
+  catch(e){ const a = t.indexOf("{"), b = t.lastIndexOf("}"); if (a >= 0 && b > a) { try { return JSON.parse(t.slice(a, b + 1)); } catch(e2){} } throw new Error("AI 답을 읽지 못했어요. '다시 정리'를 눌러 주세요."); }
+}
+
+/* ===== 받아쓰기 + 정리 ===== */
+const working = {}, progress = {};
+async function processMeeting(id, onlySummary){
+  if (working[id]) return; working[id] = true;
+  let m = await getM(id);
+  const setProg = msg => { progress[id] = msg; const el = document.getElementById("prog"); if (el && current.arg === id) el.textContent = msg; };
+  try {
+    if (!settings.key) throw new Error("설정에서 Gemini API 키를 먼저 넣어 주세요.");
+    m.status = "working"; m.error = ""; await putM(m); if (current.view === "detail" && current.arg === id) renderDetail(id);
+    if (!onlySummary || !m.utterances || !m.utterances.length) {
+      let utts = [], offset = 0, known = [];
+      for (let i = 0; i < m.segments.length; i++) {
+        const seg = m.segments[i];
+        setProg(`받아쓰는 중… (${i + 1}/${m.segments.length}구간) 회의 길이에 따라 몇 분 걸려요`);
+        const mime = geminiMime(seg);
+        const audioPart = seg.blob.size <= INLINE_LIMIT
+          ? { inline_data: { mime_type: mime, data: await blobToBase64(seg.blob) } }
+          : await uploadFile(seg.blob, mime, setProg);
+        setProg(`받아쓰는 중… (${i + 1}/${m.segments.length}구간) 회의 길이에 따라 몇 분 걸려요`);
+        const res = await generate([audioPart, { text: transcribePrompt(m, known) }]);
+        const list = Array.isArray(res.utterances) ? res.utterances : (Array.isArray(res) ? res : []);
+        list.forEach(u => {
+          const spk = String(u.speaker || "참석자").trim();
+          if (!known.includes(spk)) known.push(spk);
+          utts.push({ speaker: spk, time: offset + parseTimeStr(u.time), text: String(u.text || "").trim() });
+        });
+        offset += seg.duration || 0;
+      }
+      m.utterances = utts.filter(u => u.text);
+      if (!m.utterances.length) throw new Error("녹음에서 말소리를 찾지 못했어요. 녹음이 제대로 됐는지 '녹음' 탭에서 들어 보세요.");
+      await putM(m);
+    }
+    setProg("정리하는 중…");
+    m.summary = await generate([{ text: summaryPrompt(m) }]);
+    m.status = "done"; await putM(m);
+    toast("정리가 끝났어요");
+  } catch(e){
+    m.status = "error"; m.error = e.message; await putM(m);
+  } finally {
+    working[id] = false; progress[id] = "";
+    if (current.view === "detail" && current.arg === id) renderDetail(id);
+    else if (current.view === "list") renderList();
+  }
+}
+function transcribePrompt(m, known){
+  return `이 녹음은 한국어 회의(또는 통화)야. 들리는 말을 빠짐없이 그대로 받아적어 줘.
+규칙:
+- 말하는 사람을 목소리로 구분해서 나눠 줘. 이름을 모르면 "참석자1", "참석자2" 처럼 적어.
+${m.attendees ? `- 참석자 명단: ${m.attendees}. 대화 내용(호칭, 자기소개 등)으로 누구인지 확실히 알 수 있을 때만 이 이름을 쓰고, 확실하지 않으면 "참석자N"으로 적어.\n` : ""}${known.length ? `- 앞 구간에서 쓴 화자 이름: ${known.join(", ")}. 같은 사람이면 같은 이름을 그대로 써.\n` : ""}- 요약하거나 고치지 말고 들리는 대로 적어. "음", "어" 같은 군말만 빼.
+- 잘 안 들리는 부분은 [안 들림]으로 적어.
+- time 은 그 말이 시작된 시점(녹음 시작 기준, "분:초").
+- 사람이 바뀔 때마다 새 항목으로 나눠.
+다음 JSON 형식으로만 답해:
+{"utterances":[{"speaker":"참석자1","time":"0:05","text":"..."}]}`;
+}
+function speakerName(m, s){ return (m.speakerNames && m.speakerNames[s]) || s; }
+function transcriptText(m){ return (m.utterances || []).map(u => `${speakerName(m, u.speaker)} (${fmtTime(u.time)}): ${u.text}`).join("\n"); }
+function summaryPrompt(m){
+  return `아래는 한국어 회의 받아쓰기야. 회의 제목: ${m.title}${m.attendees ? " / 참석자: " + m.attendees : ""}
+제조업체(반응기·탱크 등 설비 제작) 직원이 업무 기록용으로 보는 정리야. 실제로 나온 내용만 쓰고, 없는 내용은 지어내지 마.
+${settings.extra ? "추가 요청: " + settings.extra + "\n" : ""}
+다음 JSON 형식으로만 답해:
+{"summary":["핵심 내용을 3~7개 문장으로"],"decisions":["정해진 것. 없으면 빈 배열"],"todos":[{"task":"할 일","owner":"담당자(모르면 빈 문자열)","due":"기한(모르면 빈 문자열)"}],"numbers":["언급된 금액·수량·치수·날짜 등 숫자 정보. 없으면 빈 배열"]}
+
+받아쓰기:
+${transcriptText(m)}`;
+}
+
+/* ===== 3. 회의 결과 ===== */
+let detailTab = "summary";
+async function renderDetail(id){
+  const m = await getM(id);
+  if (!m) return go("list");
+  const sp = [...new Set((m.utterances || []).map(u => u.speaker))];
+  const s = m.summary || {};
+  const arr = v => Array.isArray(v) ? v : (v ? [v] : []);
+  let body = "";
+  if (detailTab === "summary") {
+    if (!m.summary) body = `<div class="empty">${m.status === "working" ? "정리 중이에요…" : "아직 정리 전이에요."}</div>`;
+    else body = `
+      <div class="card sec"><h3>요약</h3><ul>${arr(s.summary).map(x => `<li>${esc(x)}</li>`).join("") || "<li>없음</li>"}</ul></div>
+      <div class="card sec"><h3>결정사항</h3><ul>${arr(s.decisions).map(x => `<li>${esc(x)}</li>`).join("") || "<li>없음</li>"}</ul></div>
+      <div class="card sec"><h3>할 일</h3><ul>${arr(s.todos).map(t => typeof t === "string" ? `<li>${esc(t)}</li>` : `<li>${esc(t.task)}${t.owner ? ` <span class="sub">· ${esc(t.owner)}</span>` : ""}${t.due ? ` <span class="sub">· ${esc(t.due)}</span>` : ""}</li>`).join("") || "<li>없음</li>"}</ul></div>
+      ${arr(s.numbers).length ? `<div class="card sec"><h3>숫자 정보</h3><ul>${arr(s.numbers).map(x => `<li>${esc(x)}</li>`).join("")}</ul></div>` : ""}`;
+  } else if (detailTab === "text") {
+    body = m.utterances && m.utterances.length ? `
+      ${sp.length ? `<p class="sub">이름을 누르면 바꿀 수 있어요. 바꾼 뒤 '다시 정리'를 누르면 정리에도 반영돼요.</p>` : ""}
+      <div class="card">${m.utterances.map(u => `<div class="utt"><button class="spk" data-s="${esc(u.speaker)}">${esc(speakerName(m, u.speaker))}</button><span class="time">${fmtTime(u.time)}</span><div>${esc(u.text)}</div></div>`).join("")}</div>`
+      : `<div class="empty">${m.status === "working" ? "받아쓰는 중이에요…" : "아직 받아쓰기 전이에요."}</div>`;
+  } else {
+    body = `<div class="card">${m.segments.map((g, i) => `<div class="sub">${m.segments.length > 1 ? `구간 ${i + 1} · ` : ""}${fmtTime(g.duration || 0)}</div><audio controls preload="none" data-i="${i}"></audio><button class="icon" data-dl="${i}">파일로 저장</button>`).join("")}</div>`;
+  }
+  $app.innerHTML = `
+    <header><button class="icon" id="bBack">‹ 목록</button><h1 id="hTitle">${esc(m.title)}</h1><button class="icon" id="bRename">이름 바꾸기</button></header>
+    <div class="sub" style="margin-bottom:10px">${fmtDate(m.createdAt)} · ${fmtTime(m.duration || 0)}${m.attendees ? " · " + esc(m.attendees) : ""}</div>
+    ${working[id] ? `<div class="progress" id="prog">${esc(progress[id] || "준비 중…")}</div>` : ""}
+    ${!working[id] && m.status === "error" ? `<div class="error">${esc(m.error)}</div>` : ""}
+    ${!working[id] && m.status === "recording" ? `<div class="notice">녹음 도중 앱이 닫혀서 그때까지 녹음된 부분만 저장됐어요.</div>` : ""}
+    <div class="tabs"><button data-t="summary" class="${detailTab === "summary" ? "on" : ""}">AI 정리</button><button data-t="text" class="${detailTab === "text" ? "on" : ""}">받아쓰기</button><button data-t="audio" class="${detailTab === "audio" ? "on" : ""}">녹음</button></div>
+    ${body}
+    <div class="row" style="margin-top:14px">
+      <button id="bCopy">복사</button><button id="bShare">공유</button>
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button id="bRun" ${working[id] ? "disabled" : ""}>${m.utterances && m.utterances.length ? "다시 정리" : "받아쓰기 + 정리"}</button>
+      ${m.utterances && m.utterances.length ? `<button id="bRedo" ${working[id] ? "disabled" : ""}>다시 받아쓰기</button>` : ""}
+    </div>
+    <button class="danger" id="bDel" style="width:100%;margin-top:24px">이 회의 삭제</button>`;
+  document.getElementById("bBack").onclick = () => go("list");
+  document.getElementById("bRename").onclick = async () => { const t = prompt("회의 제목", m.title); if (t && t.trim()) { m.title = t.trim(); await putM(m); renderDetail(id); } };
+  $app.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { detailTab = b.dataset.t; renderDetail(id); });
+  $app.querySelectorAll(".spk").forEach(b => b.onclick = async () => {
+    const old = b.dataset.s; const n = prompt(`'${speakerName(m, old)}'의 이름을 바꿔요 (이 사람이 말한 부분 전부 바뀌어요)`, speakerName(m, old));
+    if (n && n.trim()) { m.speakerNames = m.speakerNames || {}; m.speakerNames[old] = n.trim(); await putM(m); renderDetail(id); }
+  });
+  $app.querySelectorAll("audio").forEach(a => { const g = m.segments[+a.dataset.i]; a.src = URL.createObjectURL(g.blob); });
+  $app.querySelectorAll("[data-dl]").forEach(b => b.onclick = () => {
+    const g = m.segments[+b.dataset.dl]; const ext = /webm/.test(g.mime || "") ? "webm" : (/wav/.test(g.mime || "") ? "wav" : (/mpeg|mp3/.test(g.mime || "") ? "mp3" : "m4a"));
+    const f = new File([g.blob], `${m.title}${m.segments.length > 1 ? "_" + (+b.dataset.dl + 1) : ""}.${ext}`, { type: g.blob.type || "audio/mp4" });
+    if (navigator.canShare && navigator.canShare({ files: [f] })) navigator.share({ files: [f] }).catch(() => {});
+    else { const a = document.createElement("a"); a.href = URL.createObjectURL(f); a.download = f.name; a.click(); }
+  });
+  document.getElementById("bCopy").onclick = () => copyText(exportText(m));
+  document.getElementById("bShare").onclick = () => { const text = exportText(m); if (navigator.share) navigator.share({ title: m.title, text }).catch(() => {}); else copyText(text); };
+  document.getElementById("bRun").onclick = () => processMeeting(id, !!(m.utterances && m.utterances.length));
+  const redo = document.getElementById("bRedo");
+  if (redo) redo.onclick = () => { if (confirm("받아쓰기를 처음부터 다시 할까요? 바꾼 이름은 초기화돼요.")) { m.utterances = []; m.speakerNames = {}; putM(m).then(() => processMeeting(id)); } };
+  document.getElementById("bDel").onclick = async () => { if (confirm("이 회의를 삭제할까요? 녹음도 함께 지워지고 되돌릴 수 없어요.")) { await delM(id); go("list"); } };
+}
+function exportText(m){
+  const s = m.summary || {}; const arr = v => Array.isArray(v) ? v : (v ? [v] : []);
+  let t = `[${m.title}] ${fmtDate(m.createdAt)} (${fmtTime(m.duration || 0)})\n`;
+  if (m.attendees) t += `참석자: ${m.attendees}\n`;
+  if (m.summary) {
+    t += `\n■ 요약\n` + arr(s.summary).map(x => "- " + x).join("\n");
+    t += `\n\n■ 결정사항\n` + (arr(s.decisions).map(x => "- " + x).join("\n") || "- 없음");
+    t += `\n\n■ 할 일\n` + (arr(s.todos).map(x => typeof x === "string" ? "- " + x : `- ${x.task}${x.owner ? " / " + x.owner : ""}${x.due ? " / " + x.due : ""}`).join("\n") || "- 없음");
+    if (arr(s.numbers).length) t += `\n\n■ 숫자 정보\n` + arr(s.numbers).map(x => "- " + x).join("\n");
+  }
+  if (detailTab === "text" && m.utterances && m.utterances.length) t += `\n\n■ 받아쓰기\n` + transcriptText(m);
+  return t;
+}
+
+/* ===== 4. 설정 ===== */
+function renderSettings(){
+  $app.innerHTML = `
+    <header><button class="icon" id="bBack">‹ 목록</button><h1>설정</h1></header>
+    <label>Gemini API 키</label>
+    <div class="row"><input id="sKey" type="password" autocomplete="off" placeholder="AIza로 시작하는 키" value="${esc(settings.key)}" style="flex:3"><button id="bShow" style="flex:1">보기</button></div>
+    <p class="sub">키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 무료로 받을 수 있어요. 키는 이 아이폰에만 저장돼요.</p>
+    <button id="bTest" style="width:100%">키 확인하기</button>
+    <label>자주 쓰는 참석자 (쉼표로 구분)</label>
+    <input id="sPeople" value="${esc(settings.people.join(", "))}" placeholder="예: 대표님, 나">
+    <label>정리할 때 추가로 부탁할 것 (선택)</label>
+    <textarea id="sExtra" placeholder="예: 거래처 이름과 납기는 꼭 따로 적어 줘">${esc(settings.extra)}</textarea>
+    <label>AI 모델 이름 (보통 그대로 두세요)</label>
+    <input id="sModel" value="${esc(settings.model)}">
+    <button class="primary" id="bSave" style="width:100%;margin-top:18px">저장</button>
+    <p class="sub" style="margin-top:24px">무료 키를 쓰면 보낸 녹음이 구글 AI 개선에 쓰일 수 있어요. 민감한 회의는 주의하세요.<br>녹음과 기록은 이 아이폰의 Safari 안에만 저장돼요. Safari 방문 기록·데이터를 지우면 함께 지워지니, 중요한 회의는 공유 버튼으로 따로 보관하세요.</p>`;
+  document.getElementById("bBack").onclick = () => go("list");
+  document.getElementById("bShow").onclick = () => { const i = document.getElementById("sKey"); i.type = i.type === "password" ? "text" : "password"; };
+  const save = () => {
+    settings.key = document.getElementById("sKey").value;
+    settings.model = document.getElementById("sModel").value;
+    settings.people = document.getElementById("sPeople").value.split(",").map(s => s.trim()).filter(Boolean);
+    settings.extra = document.getElementById("sExtra").value.trim();
+  };
+  document.getElementById("bSave").onclick = () => { save(); toast("저장했어요"); go("list"); };
+  document.getElementById("bTest").onclick = async () => {
+    save(); const b = document.getElementById("bTest"); b.disabled = true; b.textContent = "확인 중…";
+    try { const r = await generate([{ text: '{"ok":true} 를 그대로 JSON으로 답해.' }]); b.textContent = r && r.ok ? "키가 잘 작동해요 ✓" : "응답은 왔어요 ✓"; }
+    catch(e){ b.textContent = "키 확인하기"; alert(e.message); }
+    b.disabled = false;
+  };
+}
+
+/* ===== 시작 ===== */
+(async () => {
+  try { await db(); }
+  catch(e){ $app.innerHTML = `<div class="error">저장소를 열 수 없어요. Safari 개인정보 보호 모드(비공개 브라우징)를 끄고 다시 열어 주세요.</div>`; return; }
+  // 이전에 '정리 중'에서 앱이 닫힌 회의는 다시 시도할 수 있게 상태를 되돌림
+  for (const m of await getAll()) if (m.status === "working") { m.status = "error"; m.error = "정리 도중 앱이 닫혔어요. '다시 정리'를 눌러 주세요."; await putM(m); }
+  render();
+})();
+</script>
+</body>
+</html>
