@@ -533,7 +533,7 @@ function renderSettings(){
   $app.innerHTML = `
     <header><button class="icon" id="bBack">‹ 목록</button><h1>설정</h1></header>
     <label>Gemini API 키</label>
-    <div class="row"><input id="sKey" type="password" autocomplete="off" placeholder="AIza로 시작하는 키" value="${esc(settings.key)}" style="flex:3"><button id="bShow" style="flex:1">보기</button></div>
+    <div class="row"><input id="sKey" type="password" autocomplete="off" placeholder="AQ. 또는 AIza로 시작하는 키" value="${esc(settings.key)}" style="flex:3"><button id="bShow" style="flex:1">보기</button></div>
     <p class="sub">키는 <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">Google AI Studio</a>에서 무료로 받을 수 있어요. 키는 이 아이폰에만 저장돼요.</p>
     <button id="bTest" style="width:100%">키 확인하기</button>
     <label>자주 쓰는 참석자 (쉼표로 구분)</label>
