@@ -76,6 +76,7 @@ a{color:var(--accent)}
 const API_BASE = "https://generativelanguage.googleapis.com";
 const INLINE_LIMIT = 12 * 1024 * 1024; // 이보다 큰 파일은 Files API로 업로드
 const DEFAULT_MODEL = "gemini-flash-latest";
+const SEGMENT_SEC = 40 * 60; // 이 시간마다 녹음을 자동으로 나눠 저장
 const $app = document.getElementById("app");
 
 const settings = {
@@ -215,7 +216,7 @@ function renderRecord(){
       ? `<button class="primary" id="bResume2" style="width:100%;padding:16px;font-size:18px;margin-bottom:10px">이어서 녹음</button>`
       : `<div class="row" style="margin-bottom:10px"><button id="bPause">${paused ? "다시 시작" : "일시정지"}</button></div>`}
     <button class="danger" id="bStop" style="width:100%;padding:16px;font-size:18px">녹음 끝내기</button>
-    <p class="sub" style="text-align:center;margin-top:16px">${rec.meeting.segments.length ? `이어 붙인 구간 ${rec.meeting.segments.length}개 저장됨` : ""}</p>`;
+    <p class="sub" style="text-align:center;margin-top:16px">${rec.meeting.segments.length ? `나눠 저장된 구간 ${rec.meeting.segments.length}개` : ""}</p>`;
   if (rec.interrupted) document.getElementById("bResume2").onclick = resumeAfterInterrupt;
   else document.getElementById("bPause").onclick = togglePause;
   document.getElementById("bStop").onclick = () => stopRecording(false);
@@ -238,19 +239,42 @@ async function startRecording(){
 }
 async function openSegment(){
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
+  rec.stream = stream; rec.interrupted = false; rec.active = true;
+  stream.getAudioTracks().forEach(t => { t.onended = () => markInterrupted(); });
+  startRecorder(stream);
+  clearInterval(rec.tick); rec.tick = setInterval(() => {
+    const el = document.getElementById("tTimer"); if (el) el.textContent = fmtTime(totalElapsed());
+    if (rec.running && !rec.interrupted && rec.segElapsed + (Date.now() - rec.lastResume) / 1000 >= SEGMENT_SEC) rotateSegment();
+  }, 500);
+  clearInterval(rec.saveTimer); rec.saveTimer = setInterval(saveDraft, 20000);
+  wakeOn();
+}
+function startRecorder(stream){
   const mime = pickMime();
   const opts = { audioBitsPerSecond: 32000 }; if (mime) opts.mimeType = mime;
   let r; try { r = new MediaRecorder(stream, opts); } catch(e){ r = new MediaRecorder(stream); }
-  rec.stream = stream; rec.recorder = r; rec.chunks = []; rec.segElapsed = 0; rec.interrupted = false; rec.active = true;
+  rec.recorder = r; rec.chunks = []; rec.segElapsed = 0;
   r.ondataavailable = ev => { if (ev.data && ev.data.size) rec.chunks.push(ev.data); };
   r.onerror = () => markInterrupted();
   r.onstop = () => { if (rec.active && !rec._stopping) markInterrupted(); };
-  stream.getAudioTracks().forEach(t => { t.onended = () => markInterrupted(); });
   r.start(1000);
   rec.lastResume = Date.now(); rec.running = true;
-  clearInterval(rec.tick); rec.tick = setInterval(() => { const el = document.getElementById("tTimer"); if (el) el.textContent = fmtTime(totalElapsed()); }, 500);
-  clearInterval(rec.saveTimer); rec.saveTimer = setInterval(saveDraft, 20000);
-  wakeOn();
+}
+async function rotateSegment(){
+  // 긴 회의는 40분마다 구간을 나눠 저장 (마이크는 그대로 켜 둔 채 녹음기만 새로 시작)
+  if (rec._rotating) return; rec._rotating = true;
+  try {
+    const r = rec.recorder;
+    rec.segElapsed += (Date.now() - rec.lastResume) / 1000; rec.running = false;
+    await new Promise(res => { rec._stopping = true; r.onstop = () => { rec._stopping = false; res(); }; try { r.stop(); } catch(e){ rec._stopping = false; res(); } });
+    const b = currentSegBlob();
+    if (b && b.size > 0) rec.meeting.segments.push({ blob: b, mime: b.type, duration: rec.segElapsed });
+    rec.elapsedBefore += rec.segElapsed;
+    if (rec.active && !rec.interrupted && rec.stream) startRecorder(rec.stream);
+    await putM(Object.assign(rec.meeting, { duration: totalElapsed() }));
+    if (current.view === "record") renderRecord();
+  } catch(e){ markInterrupted(); }
+  rec._rotating = false;
 }
 function currentSegBlob(){ return rec.chunks.length ? new Blob(rec.chunks, { type: (rec.recorder && rec.recorder.mimeType) || rec.chunks[0].type || "audio/mp4" }) : null; }
 async function saveDraft(){
