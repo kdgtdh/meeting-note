@@ -76,7 +76,7 @@ a{color:var(--accent)}
 const API_BASE = "https://generativelanguage.googleapis.com";
 const INLINE_LIMIT = 12 * 1024 * 1024; // 이보다 큰 파일은 Files API로 업로드
 const DEFAULT_MODEL = "gemini-flash-latest";
-const SEGMENT_SEC = 40 * 60; // 이 시간마다 녹음을 자동으로 나눠 저장
+const SEGMENT_SEC = 20 * 60; // 이 시간마다 녹음을 자동으로 나눠 저장
 const $app = document.getElementById("app");
 
 const settings = {
@@ -276,7 +276,8 @@ function startRecorder(stream){
   r.ondataavailable = ev => { if (ev.data && ev.data.size) rec.chunks.push(ev.data); };
   r.onerror = () => markInterrupted();
   r.onstop = () => { if (rec.active && !rec._stopping) markInterrupted(); };
-  r.start(1000);
+  // 아이폰(mp4)은 1초씩 쪼개 받으면 이어 붙인 파일이 앞부분만 재생되는 문제가 있어서, 끝날 때 한 번에 받음
+  if (/mp4/i.test(r.mimeType || mime)) r.start(); else r.start(1000);
   rec.lastResume = Date.now(); rec.running = true;
 }
 async function rotateSegment(){
