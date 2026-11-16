@@ -328,6 +328,7 @@ async function stopRecording(goList){
   if (settings.key) processMeeting(m.id);
 }
 document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState === "visible" && Object.values(working).some(Boolean)) wakeOn();
   if (document.visibilityState !== "visible" || !rec.active) return;
   wakeOn();
   const r = rec.recorder, tr = rec.stream && rec.stream.getAudioTracks()[0];
@@ -345,11 +346,22 @@ function friendlyError(status, body){
   if (status >= 500) return "구글 서버가 잠시 바빠요. 조금 뒤에 다시 시도해 주세요.";
   return "오류 (" + status + "): " + msg;
 }
+// 아이폰은 앱이 화면에서 벗어나면(잠금, 다른 앱) 진행 중인 연결을 끊어버림 → 돌아오면 자동으로 다시 시도
+let lastHiddenAt = 0;
+document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") lastHiddenAt = Date.now(); });
+function waitVisible(){ return document.visibilityState === "visible" ? Promise.resolve() : new Promise(res => { const h = () => { if (document.visibilityState === "visible") { document.removeEventListener("visibilitychange", h); res(); } }; document.addEventListener("visibilitychange", h); }); }
 async function gfetch(url, opts, tries = 3){
+  let hiddenRetries = 0;
   for (let i = 0; i < tries; i++) {
-    let r;
+    let r; const t0 = Date.now();
     try { r = await fetch(url, opts); }
-    catch(e){ if (i === tries - 1) throw new Error("인터넷 연결을 확인해 주세요. (" + e.message + ")"); await new Promise(s => setTimeout(s, 2000 * (i + 1))); continue; }
+    catch(e){
+      if ((document.visibilityState === "hidden" || lastHiddenAt >= t0) && hiddenRetries < 5) {
+        hiddenRetries++; await waitVisible(); await new Promise(s => setTimeout(s, 800)); i--; continue;
+      }
+      if (i === tries - 1) throw new Error("연결이 끊겼어요. 인터넷 연결을 확인하고 '다시 정리'를 눌러 주세요.\n정리하는 동안에는 화면을 끄거나 다른 앱으로 넘어가지 마세요. (" + e.message + ")");
+      await new Promise(s => setTimeout(s, 2000 * (i + 1))); continue;
+    }
     if (r.ok) return r;
     let body = null; try { body = await r.json(); } catch(e){}
     if ((r.status >= 500 || r.status === 429) && i < tries - 1) { await new Promise(s => setTimeout(s, (r.status === 429 ? 20000 : 3000) * (i + 1))); continue; }
@@ -413,6 +425,7 @@ function parseJSON(text){
 const working = {}, progress = {};
 async function processMeeting(id, onlySummary){
   if (working[id]) return; working[id] = true;
+  wakeOn(); // 정리하는 동안 화면이 자동으로 꺼지지 않게
   let m = await getM(id);
   const setProg = msg => { progress[id] = msg; const el = document.getElementById("prog"); if (el && current.arg === id) el.textContent = msg; };
   try {
@@ -449,6 +462,7 @@ async function processMeeting(id, onlySummary){
     m.status = "error"; m.error = e.message; await putM(m);
   } finally {
     working[id] = false; progress[id] = "";
+    if (!rec.active && !Object.values(working).some(Boolean)) wakeOff();
     if (current.view === "detail" && current.arg === id) renderDetail(id);
     else if (current.view === "list") renderList();
   }
@@ -504,7 +518,7 @@ async function renderDetail(id){
   $app.innerHTML = `
     <header><button class="icon" id="bBack">‹ 목록</button><h1 id="hTitle">${esc(m.title)}</h1><button class="icon" id="bRename">이름 바꾸기</button></header>
     <div class="sub" style="margin-bottom:10px">${fmtDate(m.createdAt)} · ${fmtTime(m.duration || 0)}${m.attendees ? " · " + esc(m.attendees) : ""}</div>
-    ${working[id] ? `<div class="progress" id="prog">${esc(progress[id] || "준비 중…")}</div>` : ""}
+    ${working[id] ? `<div class="progress" id="prog">${esc(progress[id] || "준비 중…")}</div><div class="notice">정리가 끝날 때까지 이 화면을 켜 두세요. 화면을 끄거나 다른 앱으로 넘어가면 멈췄다가, 돌아오면 이어서 해요.</div>` : ""}
     ${!working[id] && m.status === "error" ? `<div class="error">${esc(m.error)}</div>` : ""}
     ${!working[id] && m.status === "recording" ? `<div class="notice">녹음 도중 앱이 닫혀서 그때까지 녹음된 부분만 저장됐어요.</div>` : ""}
     <div class="tabs"><button data-t="summary" class="${detailTab === "summary" ? "on" : ""}">AI 정리</button><button data-t="text" class="${detailTab === "text" ? "on" : ""}">받아쓰기</button><button data-t="audio" class="${detailTab === "audio" ? "on" : ""}">녹음</button></div>
