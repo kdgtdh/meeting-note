@@ -235,7 +235,8 @@ function renderRecord(){
       ? `<button class="primary" id="bResume2" style="width:100%;padding:16px;font-size:18px;margin-bottom:10px">이어서 녹음</button>`
       : `<div class="row" style="margin-bottom:10px"><button id="bPause">${paused ? "다시 시작" : "일시정지"}</button></div>`}
     <button class="danger" id="bStop" style="width:100%;padding:16px;font-size:18px">녹음 끝내기</button>
-    <p class="sub" style="text-align:center;margin-top:16px">${rec.meeting.segments.length ? `나눠 저장된 구간 ${rec.meeting.segments.length}개` : ""}</p>`;
+    <p class="sub" style="text-align:center;margin-top:16px">${rec.meeting.segments.length ? `나눠 저장된 구간 ${rec.meeting.segments.length}개` : ""}</p>
+    <pre class="sub" id="tLog" style="white-space:pre-wrap;font-family:inherit;margin-top:8px">${esc((rec.meeting.log || []).slice(-5).join("\n"))}</pre>`;
   if (rec.interrupted) document.getElementById("bResume2").onclick = resumeAfterInterrupt;
   else document.getElementById("bPause").onclick = togglePause;
   document.getElementById("bStop").onclick = () => stopRecording(false);
@@ -248,6 +249,7 @@ function totalElapsed(){
 async function startRecording(){
   const title = document.getElementById("iTitle").value.trim() || ("회의 " + fmtDate(Date.now()));
   const attendees = document.getElementById("iPeople").value.trim();
+  rec.autoResumes = 0;
   rec.meeting = { id: uid(), title, attendees, createdAt: Date.now(), duration: 0, segments: [], status: "recording", speakerNames: {} };
   rec.elapsedBefore = 0;
   try { await openSegment(); }
@@ -259,7 +261,10 @@ async function startRecording(){
 async function openSegment(){
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true, autoGainControl: true } });
   rec.stream = stream; rec.interrupted = false; rec.active = true;
-  stream.getAudioTracks().forEach(t => { t.onended = () => markInterrupted(); });
+  stream.getAudioTracks().forEach(t => {
+    t.onended = () => markInterrupted("마이크가 꺼짐");
+    t.onmute = () => logRec("마이크 일시 음소거"); t.onunmute = () => logRec("마이크 음소거 해제");
+  });
   startRecorder(stream);
   clearInterval(rec.tick); rec.tick = setInterval(() => {
     const el = document.getElementById("tTimer"); if (el) el.textContent = fmtTime(totalElapsed());
@@ -274,8 +279,8 @@ function startRecorder(stream){
   let r; try { r = new MediaRecorder(stream, opts); } catch(e){ r = new MediaRecorder(stream); }
   rec.recorder = r; rec.chunks = []; rec.segElapsed = 0;
   r.ondataavailable = ev => { if (ev.data && ev.data.size) rec.chunks.push(ev.data); };
-  r.onerror = () => markInterrupted();
-  r.onstop = () => { if (rec.active && !rec._stopping) markInterrupted(); };
+  r.onerror = ev => markInterrupted("녹음기 오류 " + ((ev && ev.error && ev.error.name) || ""));
+  r.onstop = () => { if (rec.active && !rec._stopping) markInterrupted("녹음기가 스스로 멈춤"); };
   // 아이폰(mp4)은 1초씩 쪼개 받으면 이어 붙인 파일이 앞부분만 재생되는 문제가 있어서, 끝날 때 한 번에 받음
   if (/mp4/i.test(r.mimeType || mime)) r.start(); else r.start(1000);
   rec.lastResume = Date.now(); rec.running = true;
@@ -293,7 +298,7 @@ async function rotateSegment(){
     if (rec.active && !rec.interrupted && rec.stream) startRecorder(rec.stream);
     await putM(Object.assign(rec.meeting, { duration: totalElapsed() }));
     if (current.view === "record") renderRecord();
-  } catch(e){ markInterrupted(); }
+  } catch(e){ markInterrupted("구간 나누기 실패"); }
   rec._rotating = false;
 }
 function currentSegBlob(){ return rec.chunks.length ? new Blob(rec.chunks, { type: (rec.recorder && rec.recorder.mimeType) || rec.chunks[0].type || "audio/mp4" }) : null; }
@@ -321,10 +326,28 @@ function closeSegment(){
     else finish();
   });
 }
-function markInterrupted(){
+// 끊긴 원인을 화면에 남겨서 문제를 찾기 쉽게 함
+function logRec(msg){
+  if (!rec.meeting) return;
+  rec.meeting.log = rec.meeting.log || [];
+  rec.meeting.log.push(fmtTime(totalElapsed()) + " " + msg + (document.visibilityState === "hidden" ? " (화면 밖)" : ""));
+  if (rec.meeting.log.length > 30) rec.meeting.log.shift();
+  const el = document.getElementById("tLog"); if (el) el.textContent = rec.meeting.log.slice(-5).join("\n");
+}
+function markInterrupted(reason){
   if (!rec.active || rec.interrupted) return;
-  rec.interrupted = true;
-  closeSegment().then(() => { putM(Object.assign(rec.meeting, { duration: totalElapsed() })); if (current.view === "record") renderRecord(); });
+  logRec("끊김: " + (reason || "알 수 없음")); rec.interrupted = true;
+  closeSegment().then(async () => {
+    await putM(Object.assign(rec.meeting, { duration: totalElapsed() }));
+    // 화면을 보고 있는 중에 끊긴 거면 자동으로 바로 이어서 녹음 (10번까지)
+    rec.autoResumes = rec.autoResumes || 0;
+    if (document.visibilityState === "visible" && rec.active && rec.autoResumes < 10) {
+      rec.autoResumes++;
+      try { await openSegment(); logRec("자동으로 이어서 녹음"); toast("녹음이 잠깐 끊겨서 자동으로 이어서 녹음해요"); }
+      catch(e){ logRec("자동 이어서 녹음 실패: " + e.message); }
+    }
+    if (current.view === "record") renderRecord();
+  });
 }
 async function resumeAfterInterrupt(){
   try { await openSegment(); renderRecord(); }
@@ -348,11 +371,12 @@ async function stopRecording(goList){
   if (settings.key) processMeeting(m.id);
 }
 document.addEventListener("visibilitychange", () => {
+  if (rec.active) logRec(document.visibilityState === "visible" ? "앱으로 돌아옴" : "화면 꺼짐/다른 앱으로 이동");
   if (document.visibilityState === "visible" && Object.values(working).some(Boolean)) wakeOn();
   if (document.visibilityState !== "visible" || !rec.active) return;
   wakeOn();
   const r = rec.recorder, tr = rec.stream && rec.stream.getAudioTracks()[0];
-  if (!rec.interrupted && (!r || r.state === "inactive" || (tr && (tr.readyState === "ended" || tr.muted)))) markInterrupted();
+  if (!rec.interrupted && (!r || r.state === "inactive" || (tr && tr.readyState === "ended"))) markInterrupted("앱으로 돌아와 보니 녹음이 멈춰 있음");
 });
 window.addEventListener("beforeunload", e => { if (rec.active) { saveDraft(); e.preventDefault(); e.returnValue = ""; } });
 
@@ -533,7 +557,7 @@ async function renderDetail(id){
       <div class="card">${m.utterances.map(u => `<div class="utt"><button class="spk" data-s="${esc(u.speaker)}">${esc(speakerName(m, u.speaker))}</button><span class="time">${fmtTime(u.time)}</span><div>${esc(u.text)}</div></div>`).join("")}</div>`
       : `<div class="empty">${m.status === "working" ? "받아쓰는 중이에요…" : "아직 받아쓰기 전이에요."}</div>`;
   } else {
-    body = `<div class="card">${m.segments.map((g, i) => `<div class="sub">${m.segments.length > 1 ? `구간 ${i + 1} · ` : ""}${fmtTime(g.duration || 0)}</div><audio controls preload="none" data-i="${i}"></audio><button class="icon" data-dl="${i}">파일로 저장</button>`).join("")}</div>`;
+    body = `${m.log && m.log.length ? `<div class="card sub" style="white-space:pre-wrap">녹음 중 기록\n${esc(m.log.join("\n"))}</div>` : ""}<div class="card">${m.segments.map((g, i) => `<div class="sub">${m.segments.length > 1 ? `구간 ${i + 1} · ` : ""}${fmtTime(g.duration || 0)}</div><audio controls preload="none" data-i="${i}"></audio><button class="icon" data-dl="${i}">파일로 저장</button>`).join("")}</div>`;
   }
   $app.innerHTML = `
     <header><button class="icon" id="bBack">‹ 목록</button><h1 id="hTitle">${esc(m.title)}</h1><button class="icon" id="bRename">이름 바꾸기</button></header>
